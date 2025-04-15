@@ -3,12 +3,14 @@ from sqlalchemy import select
 from datetime import datetime
 from app.db import models
 from app.schemas import user as user_schema
+from app.utils.security import hash_password, verify_password
 
 def create_user(db: Session, user: user_schema.UserCreate):
+    hashed_password = hash_password(user.password)
     new_user = models.User(
         name=user.name,
         email=user.email,
-        password=user.password,
+        password=hashed_password,
         is_active=True,
         is_superuser=False
     )
@@ -49,3 +51,9 @@ def soft_delete_user(db: Session, user_id: int):
     user.deleted_at = datetime.utcnow()
     db.commit()
     return user
+
+def authenticate_user(db: Session, email: str, password: str):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user and verify_password(password, user.password):  
+        return user
+    return None
