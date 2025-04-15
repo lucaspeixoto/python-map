@@ -1,0 +1,41 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from app.db.database import get_db
+from app.schemas import user as user_schema
+from app.crud import user as user_crud
+
+router = APIRouter(
+    prefix="/users",
+    tags=["Usuários"]
+)
+
+@router.post("/", response_model=user_schema.UserOut)
+def create(user: user_schema.UserCreate, db: Session = Depends(get_db)):
+    db_user = user_crud.create_user(db, user)
+    return db_user
+
+@router.get("/{user_id}", response_model=user_schema.UserOut)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    user = user_crud.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return user
+
+@router.get("/", response_model=List[user_schema.UserOut])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return user_crud.get_all_users(db, skip=skip, limit=limit)
+
+@router.put("/{user_id}", response_model=user_schema.UserOut)
+def update(user_id: int, user_data: user_schema.UserUpdate, db: Session = Depends(get_db)):
+    updated = user_crud.update_user(db, user_id, user_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return updated
+
+@router.delete("/{user_id}", response_model=user_schema.UserOut)
+def delete(user_id: int, db: Session = Depends(get_db)):
+    deleted = user_crud.soft_delete_user(db, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return deleted
