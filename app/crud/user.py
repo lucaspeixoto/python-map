@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db import models
 from app.schemas import user as user_schema
 from app.utils.security import hash_password, verify_password
@@ -25,6 +24,12 @@ def get_user_by_id(db: Session, user_id: int):
         models.User.deleted_at.is_(None)
     ).first()
 
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(
+        models.User.email == email,
+        models.User.deleted_at.is_(None)
+    ).first()
+
 def get_all_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).filter(
         models.User.deleted_at.is_(None)
@@ -35,9 +40,11 @@ def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
     if not user:
         return None
 
-    update_data = user_data.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(user, key, value)
+    for field, value in user_data.model_dump(exclude_unset=True).items():
+        if field == "password":
+            setattr(user, field, verify_password(value))
+        else:
+            setattr(user, field, value)
 
     db.commit()
     db.refresh(user)
@@ -48,7 +55,7 @@ def soft_delete_user(db: Session, user_id: int):
     if not user:
         return None
 
-    user.deleted_at = datetime.utcnow()
+    user.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return user
 
